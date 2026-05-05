@@ -283,6 +283,8 @@
     baseline: {},
     baselineVals: {},    // {col: [raw values]} from baseline window
     speed: 1,
+    replayCount: 0,    // increments each time the loop wraps back to baseline
+    absoluteBatch: 0,  // monotonically increasing — never resets across replays
     playing: false,
     intervalId: null,
     driftThreshold: 0.2,  // PSI alert threshold (user-adjustable)
@@ -365,8 +367,10 @@
     // Loop seamlessly at end
     if (SIM.currentIdx >= SIM.batches.length) {
       SIM.currentIdx = D.baselineBatches;
+      SIM.replayCount += 1;
     }
 
+    SIM.absoluteBatch += 1;
     const batch = SIM.batches[SIM.currentIdx];
     const batchId = SIM.currentIdx + 1;
 
@@ -473,6 +477,7 @@
     // Notify
     const tickData = {
       batchId, batchNum: SIM.currentIdx, totalBatches: SIM.batches.length,
+      replayCount: SIM.replayCount, absoluteBatch: SIM.absoluteBatch,
       psiMap, zscoreMap, currentValsMap,
       displayFraudRate, lossPerHour,
       maxPSI, drifting: maxPSI > SIM.driftThreshold,

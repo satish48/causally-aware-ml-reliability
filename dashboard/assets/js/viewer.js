@@ -205,9 +205,11 @@
     const riskScore = Engine.computeRiskScore(maxPSI, displayFraudRate, 0, 0);
     const aliases = D ? D.featureAliases || {} : {};
 
-    // Batch counter
-    $('batchCounter').textContent = batchId;
-    $('batchProgressLabel').textContent = `Batch ${batchId} of ${SIM.batches.length}`;
+    // Batch counter — absolute (never resets) with replay suffix after first wrap
+    const absB = tickData.absoluteBatch || batchId;
+    const replayLabel = tickData.replayCount >= 1 ? ` · Replay ${tickData.replayCount}` : '';
+    $('batchCounter').textContent = `${absB}${replayLabel}`;
+    $('batchProgressLabel').textContent = `Batch ${absB}${replayLabel}`;
     const pct = SIM.batches.length > 0 ? (SIM.currentIdx / SIM.batches.length) * 100 : 0;
     $('batchBarFill').style.width = pct + '%';
 
@@ -257,8 +259,8 @@
     }
 
     // KPI cards
-    $('kpiBatch').textContent = sv(batchId, '—');
-    $('kpiBatchSub').textContent = `of ${SIM.batches.length} total`;
+    $('kpiBatch').textContent = absB;
+    $('kpiBatchSub').textContent = tickData.replayCount >= 1 ? `Replay ${tickData.replayCount}` : 'live';
     $('kpiFraud').textContent = fmtPct(displayFraudRate * 100);
     $('kpiFraud').className = 'metric-value ' + (displayFraudRate > 0.1 ? 'red' : displayFraudRate > 0.03 ? 'amber' : 'green');
     $('kpiPSI').textContent = fmtPSI(maxPSI);
