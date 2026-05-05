@@ -1,0 +1,95 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────
+# Causally-Aware ML Reliability Platform
+#
+# Services:
+#   platform   — FastAPI + intelligence pipeline (port 8000)
+#   prometheus — metrics scraping (port 9090)
+#   grafana    — dashboards (port 3000, admin/admin)
+#
+# Usage:
+#   docker compose up --build              # start all services
+#   docker compose up platform             # start API only
+#   docker compose --profile monitoring up --build   # start API + Prometheus
+#   docker compose run --rm platform pytest tests/ -v    # run tests
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ml-reliability-platform
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL__DATA_MODE: "${MODEL__DATA_MODE:-synthetic}"
+      MODEL__BATCH_SIZE: "${MODEL__BATCH_SIZE:-50}"
+      MODEL__INTERVAL_SECONDS: "${MODEL__INTERVAL_SECONDS:-2.0}"
+      MODEL__DRIFT_AFTER_BATCHES: "${MODEL__DRIFT_AFTER_BATCHES:-10}"
+      MODEL__RANDOM_SEED: "42"
+      MODEL__FRAUD_THRESHOLD: "0.15"
+      API__HOST: "0.0.0.0"
+      API__PORT: "8000"
+      API__LOG_LEVEL: "info"
+      LOGGING__JSON_FORMAT: "true"
+      STATE_STORE__ENABLED: "true"
+      STATE_STORE__SQLITE_PATH: "/var/lib/ml-platform/platform.sqlite3"
+      STATE_STORE__MAX_SNAPSHOTS: "5000"
+      MONITORING__DRIFT_THRESHOLD: "0.15"
+      MONITORING__ALERT_FRAUD_RATE: "0.30"
+      DATA__PATH: "data/creditcard.csv"
+      DATA__LABEL_COLUMN: "Class"
+      DATA__MAX_FEATURES: "10"
+    volumes:
+      # Mount the real credit card CSV so it is not baked into the image
+      - ./data:/app/data:ro
+      - platform-state:/var/lib/ml-platform
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ml-net
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: ml-prometheus
+    profiles: ["monitoring"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - ml-net
+    depends_on:
+      platform:
+        condition: service_healthy
+
+  # ── Optional: Grafana ────────────────────────────────────────
+  # grafana:
+  #   image: grafana/grafana:10.4.0
+  #   container_name: ml-grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: admin
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #   networks:
+  #     - ml-net
+  #   depends_on:
+  #     - prometheus
+
+networks:
+  ml-net:
+    driver: bridge
+
+volumes:
+  platform-state:

@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.git
+.pytest_cache
+__pycache__
+realvenv
+.venv
+venv
+state
+htmlcov
+.mypy_cache
+.ruff_cache
+data

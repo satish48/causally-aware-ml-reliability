@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ML Incident Command Center</title>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="stylesheet" href="assets/css/viewer.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="assets/js/parser.js" defer></script>
+  <script src="assets/js/engine.js" defer></script>
+  <script src="assets/js/tooltip.js" defer></script>
+  <script src="assets/js/viewer.js" defer></script>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay" class="loading-overlay" style="display:none">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <div class="loading-title" id="loadingTitle">Parsing dataset…</div>
+    <div class="loading-sub" id="loadingMsg">Reading CSV structure</div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- DEMO BANNER -->
+<div id="demoBanner" class="demo-banner" style="display:none">
+  <span>🔬 Demo mode · Synthetic PaySim-style data · Drift injected at batch 50 · </span>
+  <label class="demo-upload-link">Load your own CSV ↑<input type="file" id="demoBannerUpload" accept=".csv" style="display:none"></label>
+</div>
+
+<!-- MAIN WRAPPER -->
+<main class="wrapper" id="mainWrapper">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">ML</div>
+      <div class="brand-copy">
+        <div class="brand-kicker">Production ML Incident Command Center</div>
+        <div class="brand-title">Causally-Aware <span>ML Reliability</span> Platform</div>
+        <div class="brand-subtitle" id="datasetSubtitle">Drop any CSV to begin real-time drift simulation</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="topbar-dataset" id="topbarDataset" style="display:none">
+        <div class="dataset-chip">
+          <span class="dataset-icon">📊</span>
+          <span id="datasetLabel">No dataset</span>
+        </div>
+      </div>
+      <div class="pill" id="statusPill"><span class="dot"></span><span id="statusText">No data</span></div>
+      <div class="clock-block">
+        <div class="clock-label">Batch</div>
+        <div id="batchCounter">—</div>
+      </div>
+      <label class="csv-upload-btn" title="Load any CSV file">
+        📂 Load CSV
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+      </label>
+    </div>
+  </header>
+
+  <!-- LANDING STATE -->
+  <div id="landingState" class="landing-state">
+    <div class="landing-drop-zone" id="dropZone">
+      <div class="drop-icon">⬆</div>
+      <div class="drop-title">Drop any CSV file here</div>
+      <div class="drop-sub">or click to browse · supports files up to 500MB (samples first 2MB)</div>
+      <label class="drop-browse-btn">
+        Browse CSV
+        <input type="file" id="csvDropInput" accept=".csv" style="display:none">
+      </label>
+    </div>
+
+    <div class="landing-or">or try a demo</div>
+
+    <div class="demo-cards">
+      <div class="demo-card" onclick="App.loadDemo('fraud')">
+        <div class="demo-card-icon">💳</div>
+        <div class="demo-card-title">Fraud Detection</div>
+        <div class="demo-card-desc">Synthetic PaySim mobile money dataset · 8 numeric features · Drift at batch 50</div>
+        <div class="demo-card-tag">0.2% fraud rate</div>
+      </div>
+      <div class="demo-card" onclick="App.loadDemo('churn')">
+        <div class="demo-card-icon">📉</div>
+        <div class="demo-card-title">Churn Prediction</div>
+        <div class="demo-card-desc">Synthetic telco churn dataset · 9 features · Drift at batch 45</div>
+        <div class="demo-card-tag">8.4% churn rate</div>
+      </div>
+      <div class="demo-card" onclick="App.loadDemo('anomaly')">
+        <div class="demo-card-icon">🌡</div>
+        <div class="demo-card-title">Anomaly Detection</div>
+        <div class="demo-card-desc">Synthetic sensor data · 6 features · Drift at batch 60</div>
+        <div class="demo-card-tag">1.1% anomaly rate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD STATE -->
+  <div id="dashboardState" style="display:none">
+
+    <!-- Critical incident banner -->
+    <div id="criticalBanner" class="critical-banner" role="alert" aria-live="assertive" style="display:none">
+      <span class="banner-icon">⚠</span>
+      <div class="banner-body">
+        <div class="banner-title" id="bannerTitle">Drift Incident Active</div>
+        <div class="banner-msg" id="bannerMsg">Significant distribution shift detected.</div>
+      </div>
+      <div class="banner-eta" id="bannerEta"></div>
+    </div>
+
+    <!-- Command strip -->
+    <section class="command-strip" id="commandStrip">
+      <div class="state-block">
+        <div class="state-led" id="stateLed"></div>
+        <div>
+          <div class="state-label" id="stateLabel">STABLE</div>
+          <div class="state-sub" id="stateSub">Monitoring</div>
+        </div>
+      </div>
+      <div class="strip-narrative" id="stripNarrative">Simulation starting…</div>
+      <div class="strip-stat">
+        <div class="strip-value ok" id="heroRiskScore">—</div>
+        <div class="strip-label">Risk Score</div>
+      </div>
+      <div class="strip-stat">
+        <div class="strip-value ok" id="heroLoss">—</div>
+        <div class="strip-label" id="heroLossLabel">Loss / Hr</div>
+      </div>
+      <div class="strip-stat">
+        <div class="strip-value ok" id="heroFraud">—</div>
+        <div class="strip-label" id="heroFraudLabel">Event Rate</div>
+      </div>
+      <div class="strip-stat">
+        <div class="strip-value ok" id="heroMaxPSI">—</div>
+        <div class="strip-label">Peak PSI</div>
+      </div>
+    </section>
+
+    <!-- Playback controls -->
+    <section class="playback-bar">
+      <div class="playback-buttons">
+        <button class="pb-btn" id="btnPlay"  onclick="App.play()"  title="Play (Space)">▶ Play</button>
+        <button class="pb-btn" id="btnPause" onclick="App.pause()" title="Pause (Space)" style="display:none">⏸ Pause</button>
+        <button class="pb-btn secondary" onclick="App.resetSim()" title="Reset (R)">⏹ Reset</button>
+      </div>
+      <div class="speed-buttons">
+        <span class="speed-label">Speed</span>
+        <button class="speed-btn active" id="spd1"  onclick="App.setSpeed(1,this)">1×</button>
+        <button class="speed-btn"        id="spd3"  onclick="App.setSpeed(3,this)">3×</button>
+        <button class="speed-btn"        id="spd10" onclick="App.setSpeed(10,this)">10×</button>
+      </div>
+      <div class="batch-progress">
+        <span id="batchProgressLabel">Batch — of —</span>
+        <div class="batch-bar-track"><div class="batch-bar-fill" id="batchBarFill" style="width:0%"></div></div>
+      </div>
+      <button class="pb-btn secondary export-btn" onclick="App.exportReport()">⬇ Export Report</button>
+    </section>
+
+    <!-- Primary grid: root cause + decision -->
+    <section class="primary-grid">
+      <div class="panel" id="rootCausePanel">
+        <div class="panel-title red">Root Cause Attribution</div>
+        <div id="rootCauseAttribution"><div class="empty">Waiting for drift onset to generate causal hypotheses…</div></div>
+      </div>
+      <div class="panel" id="finalDecisionPanel">
+        <div class="panel-title amber">Decision Engine</div>
+        <div id="finalDecision"><div class="empty">Decision engine active — no incident in progress.</div></div>
+      </div>
+    </section>
+
+    <!-- Feature Drift Heatmap -->
+    <section class="panel" id="heatmapPanel" style="margin-bottom:16px">
+      <div class="panel-header-row">
+        <div class="panel-title">Feature Drift Heatmap <span class="live-badge">LIVE</span></div>
+        <div class="heatmap-controls">
+          <label class="threshold-control">
+            PSI Alert Threshold: <strong id="thresholdDisplay">0.20</strong>
+            <input type="range" id="psiSlider" min="5" max="60" value="20" step="1" class="psi-slider">
+          </label>
+        </div>
+      </div>
+      <div id="heatmapContainer" class="heatmap-container">
+        <div class="empty">Heatmap will populate after the first drift events…</div>
+      </div>
+      <div id="heatmapDrilldown" class="heatmap-drilldown" style="display:none">
+        <div class="drilldown-header">
+          <span id="drilldownTitle">Feature drilldown</span>
+          <button onclick="App.closeDrilldown()" class="drilldown-close">✕</button>
+        </div>
+        <div class="drilldown-chart-wrap">
+          <canvas id="drilldownChart" role="img" aria-label="Feature mean over time drilldown chart"></canvas>
+        </div>
+        <div id="drilldownStats" class="drilldown-stats"></div>
+      </div>
+    </section>
+
+    <!-- Timeline -->
+    <section class="panel" style="margin-bottom:16px" id="timelinePanel">
+      <div class="panel-title purple">Causal Incident Timeline</div>
+      <div class="timeline-narrative" id="timelineNarrative">Waiting for causal evidence…</div>
+      <div class="timeline" id="causalTimeline"><div class="empty">No events yet</div></div>
+    </section>
+
+    <!-- Intel grid -->
+    <section class="intel-grid">
+      <div class="panel" id="riskForecastPanel">
+        <div class="panel-title amber">Risk Forecast</div>
+        <div id="riskForecast"><div class="empty">Waiting for data…</div></div>
+      </div>
+      <div class="panel" id="decisionSimPanel">
+        <div class="panel-title purple">Decision Simulation</div>
+        <div id="decisionSimulation"><div class="empty">Waiting for simulation engine…</div></div>
+      </div>
+      <div class="panel" id="lossProjectionPanel">
+        <div class="panel-title red">Loss Trajectory — 3 Scenarios</div>
+        <div class="chart-wrap" style="height:220px">
+          <canvas id="lossChart" role="img" aria-label="3-scenario loss trajectory projection chart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Operator control system -->
+    <div class="divider control-divider">Operator Control System</div>
+
+    <section class="control-panel-grid">
+      <div class="panel control-execute-panel">
+        <div class="panel-title green">Execute Action</div>
+        <p class="ctrl-intro">Click to record an operator decision. System projects outcome at T+5, T+15, T+30 min.</p>
+        <div class="ctrl-buttons">
+          <button class="ctrl-btn danger"  data-action="rollback"           data-tooltip-type="action" onclick="App.executeAction(this)">⚡ Rollback Model</button>
+          <button class="ctrl-btn warn"    data-action="increase_review"    data-tooltip-type="action" onclick="App.executeAction(this)">🔍 Increase Manual Review</button>
+          <button class="ctrl-btn blue"    data-action="trigger_retraining" data-tooltip-type="action" onclick="App.executeAction(this)">🔄 Trigger Retraining</button>
+          <button class="ctrl-btn purple"  data-action="open_incident"      data-tooltip-type="action" onclick="App.executeAction(this)">🚨 Open Incident</button>
+          <button class="ctrl-btn muted"   data-action="monitor"            data-tooltip-type="action" onclick="App.executeAction(this)">👁 Continue Monitoring</button>
+        </div>
+        <textarea class="ctrl-notes" id="ctrlNotes" placeholder="Optional operator note…" rows="2"></textarea>
+        <div id="ctrlFeedback" class="ctrl-feedback"></div>
+      </div>
+
+      <div class="panel control-consequence-panel">
+        <div class="panel-title amber">What Happens Next</div>
+        <div id="consequencePreview"><div class="empty">Click an action above to see projected outcome at T+5, T+15, T+30 minutes.</div></div>
+      </div>
+
+      <div class="panel control-inject-panel">
+        <div class="panel-title purple">Inject Upstream Event</div>
+        <p class="ctrl-intro">Register an upstream change so the causal engine can attribute drift to it.</p>
+        <select class="ctrl-select" id="injectEventType">
+          <option value="distribution_shift">Distribution Shift</option>
+          <option value="schema_change">Schema Change</option>
+          <option value="model_deployment">Model Deployment</option>
+          <option value="traffic_anomaly">Traffic Anomaly</option>
+          <option value="data_quality">Data Quality Issue</option>
+          <option value="feature_store_lag">Feature Store Lag</option>
+        </select>
+        <input class="ctrl-input" id="injectSource" type="text" placeholder="Source (e.g. payments-service)" />
+        <input class="ctrl-input" id="injectFields" type="text" placeholder="Affected features (comma-sep)" />
+        <button class="ctrl-btn purple inject-btn" onclick="App.injectEvent()">Inject → Causal Engine</button>
+        <div id="injectFeedback" class="ctrl-feedback"></div>
+      </div>
+    </section>
+
+    <!-- Action log -->
+    <section class="panel control-log-panel" style="margin-bottom:16px">
+      <div class="panel-title">Operator Action Log <span class="log-live-badge">LIVE</span></div>
+      <div id="controlLog"><div class="empty">No operator actions recorded yet.</div></div>
+    </section>
+
+    <div class="divider">Supporting Evidence</div>
+
+    <!-- KPI cards -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Batch</div>
+        <div class="metric-value blue" id="kpiBatch">—</div>
+        <div class="metric-sub" id="kpiBatchSub">of — total</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label" id="kpiFraudLabel">Event Rate</div>
+        <div class="metric-value green" id="kpiFraud">—</div>
+        <div class="metric-sub">Current batch</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Peak PSI</div>
+        <div class="metric-value amber" id="kpiPSI">—</div>
+        <div class="metric-sub">Max feature shift</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Top Drifted Feature</div>
+        <div class="metric-value amber" id="kpiTopFeature">—</div>
+        <div class="metric-sub" id="kpiTopPSI">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Dataset</div>
+        <div class="metric-value green" id="kpiDataset">—</div>
+        <div class="metric-sub" id="kpiDatasetSub">—</div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="charts-grid">
+      <div class="panel">
+        <div class="panel-title" id="fraudChartTitle">Event Rate Trend</div>
+        <div class="chart-wrap"><canvas id="metricsChart" role="img" aria-label="Event rate and loss history chart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Drift Analysis — PSI &amp; Z-Score</div>
+        <div class="chart-wrap"><canvas id="driftChart" role="img" aria-label="PSI and Z-score drift analysis chart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Bottom grid -->
+    <section class="bottom-grid">
+      <div class="panel">
+        <div class="panel-title red">Recent Drift Alerts</div>
+        <div class="alerts" id="alertsList"><div class="empty">No alerts yet</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Feature Means (Live vs Baseline)</div>
+        <div id="featureMeans"><div class="empty">Waiting for data…</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Live Event Log</div>
+        <div class="terminal" id="terminalLog">
+          <div class="t-line">
+            <span class="t-time">--:--:--</span>
+            <span class="t-level info">INFO</span>
+            <span class="t-msg">Dashboard initialized</span>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Drift Signal Diagnostics</div>
+        <div id="driftDiagnostics"><div class="empty">Waiting for signal data…</div></div>
+      </div>
+    </section>
+
+  </div><!-- end dashboardState -->
+</main>
+
+</body>
+</html>
