@@ -127,6 +127,18 @@ body::before {
   color: var(--green);
 }
 
+/* One-liner value prop — understated, single line, below the main title */
+.brand-tagline {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text3);
+  letter-spacing: 0.01em;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .brand-subtitle {
   max-width: 760px;
   color: var(--text2);
@@ -900,6 +912,34 @@ body::before {
   font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 0.12em;
+}
+
+/* Process action badge — muted, distinguishes escalation from remediation */
+.process-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid rgba(160, 160, 200, 0.25);
+  color: var(--text3);
+  font-size: 0.60rem;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+}
+
+/* Process action card — slightly muted vs remediation cards */
+.sim-card.process-action {
+  opacity: 0.82;
+  border-color: rgba(121, 183, 255, 0.06);
+  background: linear-gradient(180deg, rgba(14, 24, 40, 0.90), rgba(8, 13, 22, 0.85));
+}
+
+/* Muted loss % on process-action cards so the big number doesn't over-promise */
+.sim-loss.muted {
+  color: var(--text2);
+  font-size: 1.5rem;
 }
 
 .sim-action {

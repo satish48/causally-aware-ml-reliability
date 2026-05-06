@@ -491,20 +491,25 @@
     const { lossPerHour, displayFraudRate } = tickData;
     const SIM = Engine.SIM;
     const recommended = SIM.actionState.active || (displayFraudRate > 0.05 ? 'rollback' : 'monitor');
+    // Remediation actions: directly reduce loss. Process actions: escalation / investigation only.
     const sims = [
-      { action: 'rollback',           loss_pct: 74, risk: 'low',    eta: '2–5 min',  cost: 'Low' },
-      { action: 'increase_review',    loss_pct: 55, risk: 'medium', eta: 'Immediate',cost: 'Medium' },
-      { action: 'trigger_retraining', loss_pct: 33, risk: 'medium', eta: '45–90 min',cost: 'High' },
-      { action: 'open_incident',      loss_pct: 10, risk: 'high',   eta: 'Page now', cost: 'None' },
+      { action: 'rollback',           loss_pct: 74, risk: 'low',    eta: '2–5 min',  cost: 'Low',  process: false },
+      { action: 'increase_review',    loss_pct: 55, risk: 'medium', eta: 'Immediate',cost: 'Medium',process: false },
+      { action: 'trigger_retraining', loss_pct: 33, risk: 'medium', eta: '45–90 min',cost: 'High', process: false },
+      { action: 'open_incident',      loss_pct: 10, risk: 'high',   eta: 'Page now', cost: 'None', process: true  },
     ];
     $('decisionSimulation').innerHTML = `<div class="sim-grid">${sims.map(s => {
       const isRec = s.action === recommended;
       const saved = Math.round(lossPerHour * (s.loss_pct / 100));
-      return `<div class="sim-card ${isRec ? 'recommended' : ''}">
+      const subText = s.process
+        ? 'Escalation only · no direct loss mitigation'
+        : `Projected loss reduction · saves ${fmtMoney(saved)}/hr`;
+      return `<div class="sim-card ${isRec ? 'recommended' : ''} ${s.process ? 'process-action' : ''}">
         ${isRec ? '<div class="rec-badge">RECOMMENDED</div>' : ''}
+        ${s.process && !isRec ? '<div class="process-badge">PROCESS ACTION</div>' : ''}
         <div class="sim-action">${s.action.replace(/_/g, ' ')}</div>
-        <div class="sim-loss">${s.loss_pct}%</div>
-        <div class="sim-sub">Projected loss reduction · saves ${fmtMoney(saved)}/hr</div>
+        <div class="sim-loss ${s.process ? 'muted' : ''}">${s.loss_pct}%</div>
+        <div class="sim-sub">${subText}</div>
         <div class="sim-risk ${s.risk}">${s.risk.toUpperCase()} RISK</div>
         <div class="sim-metric-row">
           <div class="sim-metric"><span>Time to effect</span><strong>${s.eta}</strong></div>
