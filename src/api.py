@@ -741,6 +741,19 @@ def create_app() -> FastAPI:
     app.state.runtime = RuntimeState()
     app.state.websocket_clients = 0
 
+    # TrustedHostMiddleware first — rejects spoofed Host headers before any
+    # other middleware runs. Explicit list merges config defaults with Render
+    # cloud domains so the same binary works locally and in production.
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=[
+            "localhost",
+            "127.0.0.1",
+            "*.onrender.com",
+            "causally-aware-ml-reliability.onrender.com",
+            *cfg.api.trusted_hosts,   # pull in any extra hosts from config/env
+        ],
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cfg.api.cors_origins,
@@ -749,7 +762,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=512)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=cfg.api.trusted_hosts)
 
     @app.middleware("http")
     async def instrument_http_requests(request: Request, call_next):
