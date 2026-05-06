@@ -246,12 +246,51 @@
         : 'No active incidents. All features within SLO bounds. Watching for distribution shift.');
 
     // Critical banner + incident-active class for Loss pulse (Bug 5)
+    // Severity is driven by riskScore, not just incidentActive boolean:
+    //   riskScore >= 70 → red  + "Incident Active"
+    //   riskScore < 70  → amber + "Drift Detected"
+    //   riskScore < 30  → amber + "Drift Detected" (same, just lower intensity implied by score)
     const wrapper = $('mainWrapper');
-    if (incidentActive) {
-      $('criticalBanner').style.display = 'flex';
+    const showBanner = incidentActive || drifting;
+    if (showBanner) {
+      const banner = $('criticalBanner');
+      banner.style.display = 'flex';
+
+      // Severity class
+      const isRedSeverity = riskScore >= 70;
+      banner.className = 'critical-banner' + (isRedSeverity ? '' : ' banner-amber');
+
+      // Title — reserve "Incident Active" for risk >= 70
+      $('bannerTitle').textContent = isRedSeverity ? 'Incident Active' : 'Drift Detected';
+
+      // Technical detail line (unchanged — PSI, attribution, fraud rate, loss)
       const topCount = topDriftedFeatures.filter(f => (tickData.psiMap[f] || 0) > Engine.SIM.driftThreshold).length;
       $('bannerMsg').textContent = `${topCount} feature${topCount !== 1 ? 's' : ''} drifting — ${topAlias || 'features'} leading (PSI=${fmtPSI(maxPSI)}) · ${D ? D.targetName : 'Event'} rate ${fmtPct(displayFraudRate * 100)} · Loss ${fmtMoney(lossPerHour)}/hr`;
       $('bannerEta').textContent = `Risk: ${riskScore}/100`;
+
+      // Recommended action secondary line — shown only when decision confidence > 70%
+      const topHyp = Engine.SIM.hypotheses && Engine.SIM.hypotheses[0];
+      const decisionConf = topHyp ? (topHyp.confidence || 0) : 0;
+      const bannerAction = $('bannerAction');
+      if (bannerAction) {
+        if (decisionConf > 0.70 && lossPerHour > 0) {
+          // Mirror decision panel action selection
+          let recActionKey = 'monitor';
+          if (incidentActive && riskScore >= 70)   recActionKey = 'rollback';
+          else if (drifting   && riskScore >= 40)   recActionKey = 'increase_review';
+          else if (drifting)                         recActionKey = 'open_incident';
+          const proj = Engine.projectOutcome(recActionKey, displayFraudRate, lossPerHour);
+          const savedPerHr = Math.max(0, Math.round(lossPerHour - proj.t15LossPerHour));
+          const recLabel = recActionKey.replace(/_/g, ' ');
+          bannerAction.textContent = savedPerHr > 0
+            ? `Recommended: ${recLabel} — saves ${fmtMoney(savedPerHr)}/hr`
+            : `Recommended: ${recLabel}`;
+          bannerAction.style.display = 'block';
+        } else {
+          bannerAction.style.display = 'none';
+        }
+      }
+
       if (wrapper) wrapper.classList.add('incident-active');
     } else {
       $('criticalBanner').style.display = 'none';

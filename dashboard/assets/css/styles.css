@@ -1769,15 +1769,26 @@ body::before {
   gap: 14px;
   padding: 14px 20px;
   border-radius: var(--radius-sm);
+  /* default = red (risk >= 70); overridden by .banner-amber below */
   border: 1px solid rgba(255,108,120,0.45);
   background: linear-gradient(135deg, rgba(255,108,120,0.12), rgba(139,0,30,0.08));
   margin-bottom: 16px;
   animation: pulse-border 2s ease-in-out infinite;
 }
+/* Amber/warning severity — risk < 70 */
+#criticalBanner.banner-amber {
+  border-color: rgba(255,196,107,0.45);
+  background: linear-gradient(135deg, rgba(255,196,107,0.10), rgba(120,80,0,0.07));
+  animation: pulse-border-amber 2s ease-in-out infinite;
+}
 #criticalBanner.active { display: flex; }
 @keyframes pulse-border {
   0%, 100% { border-color: rgba(255,108,120,0.45); }
   50%       { border-color: rgba(255,108,120,0.85); }
+}
+@keyframes pulse-border-amber {
+  0%, 100% { border-color: rgba(255,196,107,0.45); }
+  50%       { border-color: rgba(255,196,107,0.85); }
 }
 .banner-icon {
   font-size: 22px;
@@ -1791,6 +1802,8 @@ body::before {
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+/* Amber title color when banner is in warning severity */
+#criticalBanner.banner-amber .banner-title { color: #ffc46b; }
 .banner-msg {
   font-size: 12px;
   color: var(--text2);
@@ -1798,6 +1811,14 @@ body::before {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Recommended action secondary line */
+.banner-action {
+  font-size: 11px;
+  font-weight: 600;
+  color: #3fe0a1;        /* green — positive, actionable */
+  margin-top: 4px;
+  letter-spacing: 0.01em;
 }
 .banner-eta {
   font-size: 11px;
